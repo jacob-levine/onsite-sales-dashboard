@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Onsite Sales Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+:root { color-scheme: light; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #fff;
+  color: #111;
+  padding: 20px 24px 28px;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.header-left {}
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+}
+.green-dot {
+  width: 10px; height: 10px;
+  background: #16a34a;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.title-text { color: #111; }
+.last-refreshed { font-size: 11.5px; color: #888; margin-top: 4px; }
+.last-refreshed strong { font-weight: 600; color: #555; }
+
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+/* ── Period tabs ── */
+.period-tabs {
+  display: flex;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.ptab {
+  padding: 6px 15px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: #777;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+.ptab + .ptab { border-left: 1px solid #e0e0e0; }
+.ptab.active { background: #16a34a; color: #fff; }
+.ptab:hover:not(.active) { background: #f5f5f5; }
+
+/* ── Custom date range ── */
+.custom-range { display: none; align-items: center; gap: 6px; font-size: 12px; }
+.custom-range.show { display: flex; }
+.custom-range input { border: 1px solid #ddd; border-radius: 5px; padding: 5px 8px; font-size: 12px; }
+.custom-range .apply-btn {
+  padding: 5px 11px; font-size: 12px;
+  border: none; border-radius: 5px;
+  background: #16a34a; color: #fff; cursor: pointer;
+}
+
+/* ── Error bar ── */
+.error-bar {
+  display: none;
+  background: #fef2f2; border: 1px solid #fca5a5;
+  border-radius: 8px; padding: 10px 14px;
+  color: #b91c1c; font-size: 12.5px; margin-bottom: 16px;
+}
+.error-bar.show { display: block; }
+
+/* ── Chart card ── */
+.chart-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 18px 20px 16px;
+  margin-bottom: 14px;
+  background: #fff;
+}
+.chart-card-title { font-size: 14px; font-weight: 600; color: #111; }
+.chart-card-sub { font-size: 12px; color: #999; margin-top: 3px; }
+.chart-wrap { height: 190px; margin-top: 14px; position: relative; }
+
+/* ── Metrics ── */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.metric-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fff;
+}
+.metric-card.highlighted {
+  border-color: #d1fae5;
+  background: #f0fdf4;
+}
+.mlabel {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.6px;
+  color: #aaa; margin-bottom: 8px;
+}
+.mvalue {
+  font-size: 28px; font-weight: 700;
+  color: #111; line-height: 1;
+  letter-spacing: -0.5px;
+}
+.mvalue.green { color: #16a34a; }
+.msub { font-size: 11px; color: #aaa; margin-top: 7px; line-height: 1.4; }
+
+/* ── Stage table ── */
+.stage-card {
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 18px 20px 4px;
+  background: #fff;
+}
+.stage-title { font-size: 14px; font-weight: 600; color: #111; }
+.stage-sub { font-size: 12px; color: #999; margin-top: 3px; margin-bottom: 14px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: #bbb; padding: 0 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+}
+thead th:nth-child(2), thead th:nth-child(3) { text-align: right; }
+tbody tr.stage-row { cursor: pointer; }
+tbody tr.stage-row:hover > td { background: #fafafa; }
+tbody tr.stage-row > td {
+  padding: 11px 8px;
+  border-bottom: 1px solid #f5f5f5;
+  vertical-align: middle;
+}
+.chevron {
+  display: inline-flex; align-items: center;
+  color: #ccc; margin-right: 7px;
+  transition: transform 0.18s;
+  vertical-align: middle;
+}
+.chevron.open { transform: rotate(90deg); color: #888; }
+.stage-badge {
+  display: inline-block;
+  padding: 3px 11px; border-radius: 20px;
+  font-size: 12px; font-weight: 500;
+  background: #f3f4f6; color: #374151;
+}
+.deal-sub-row td {
+  padding: 7px 8px 7px 38px;
+  font-size: 12px; color: #777;
+  background: #fafafa;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+/* Loading state */
+.loading-msg {
+  text-align: center; padding: 28px;
+  color: #bbb; font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<div class="error-bar" id="errorBar"></div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="title-row">
+      <span class="green-dot"></span>
+      <span class="title-text">Onsite Sales Dashboard</span>
+    </div>
+    <div class="last-refreshed" id="lastRefreshed">
+      <strong>Last refreshed from HubSpot:</strong> —
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="custom-range" id="customRange">
+      <input type="date" id="dateFrom">
+      <span style="color:#999">to</span>
+      <input type="date" id="dateTo">
+      <button class="apply-btn" onclick="applyCustom()">Apply</button>
+    </div>
+    <div class="period-tabs">
+      <button class="ptab active" data-p="ytd">YTD</button>
+      <button class="ptab" data-p="qtd">QTD</button>
+      <button class="ptab" data-p="mtd">MTD</button>
+      <button class="ptab" data-p="custom">Custom</button>
+    </div>
+  </div>
+</div>
+
+<!-- ARR Chart -->
+<div class="chart-card">
+  <div class="chart-card-title" id="chartTitle">ARR Growth — YTD</div>
+  <div class="chart-card-sub" id="chartSub">—</div>
+  <div class="chart-wrap"><canvas id="arrChart"></canvas></div>
+</div>
+
+<!-- Metrics -->
+<div class="metrics-grid">
+  <div class="metric-card">
+    <div class="mlabel">Open Pipeline</div>
+    <div class="mvalue" id="mPipe">—</div>
+    <div class="msub" id="mPipeSub">—</div>
+  </div>
+  <div class="metric-card">
+    <div class="mlabel">Active Trials</div>
+    <div class="mvalue" id="mTrial">—</div>
+    <div class="msub" id="mTrialSub">—</div>
+  </div>
+  <div class="metric-card highlighted">
+    <div class="mlabel">ARR</div>
+    <div class="mvalue green" id="mArr">—</div>
+    <div class="msub" id="mArrSub">—</div>
+  </div>
+  <div class="metric-card">
+    <div class="mlabel">Close Rate</div>
+    <div class="mvalue" id="mClose">—</div>
+    <div class="msub" id="mCloseSub">—</div>
+  </div>
+  <div class="metric-card">
+    <div class="mlabel">Avg. Sales Cycle</div>
+    <div class="mvalue" id="mCycle">—</div>
+    <div class="msub">creation → closed won</div>
+  </div>
+</div>
+
+<!-- Stage Table -->
+<div class="stage-card">
+  <div class="stage-title">Active Deals by Stage</div>
+  <div class="stage-sub">Click a row to see deals · Excludes Backlog</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Stage</th>
+        <th style="text-align:right">Deals</th>
+        <th style="text-align:right">Value</th>
+      </tr>
+    </thead>
+    <tbody id="stageBody">
+      <tr><td colspan="3" class="loading-msg">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+// ── Stage config ──
+const STAGES = [
+  { id: 'appointmentscheduled',  label: 'New Lead' },
+  { id: 'qualifiedtobuy',        label: 'Contacted' },
+  { id: 'presentationscheduled', label: 'Qualified' },
+  { id: 'contractsent',          label: 'Booked Meeting' },
+  { id: 'stage_0',               label: 'Demo / Discovery' },
+  { id: 'stage_1',               label: 'Contract Sent' },
+  { id: '3597724373',            label: 'Free Trial' },
+];
+const TRIAL_STAGE = '3597724373';
+
+// ── State ──
+let allDeals      = [];
+let period        = localStorage.getItem('ods_period') || 'ytd';
+let customFrom    = null;
+let customTo      = null;
+let chartInstance = null;
+let expanded      = new Set(JSON.parse(localStorage.getItem('ods_expanded') || '[]'));
+
+const $ = id => document.getElementById(id);
+
+function fmtK(n) {
+  if (!n || isNaN(n)) return '$0';
+  if (n >= 1e6) return '$' + (n/1e6).toFixed(1).replace(/\.0$/,'') + 'M';
+  if (n >= 1e3) return '$' + (n/1e3).toFixed(1).replace(/\.0$/,'') + 'K';
+  return '$' + Math.round(n).toLocaleString();
+}
+
+function fmtTimestamp(ts) {
+  return new Date(ts).toLocaleString('en-US', {
+    month:'short', day:'numeric', year:'numeric',
+    hour:'numeric', minute:'2-digit', hour12:true, timeZoneName:'short'
+  });
+}
+
+function getRange() {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  if (period === 'ytd')  return { s: new Date(y,0,1),       e: now, lbl:'YTD' };
+  if (period === 'qtd')  return { s: new Date(y,Math.floor(m/3)*3,1), e: now, lbl:'QTD' };
+  if (period === 'mtd')  return { s: new Date(y,m,1),       e: now, lbl:'MTD' };
+  if (period === 'custom' && customFrom && customTo) return { s:customFrom, e:customTo, lbl:'Custom' };
+  return { s: new Date(y,2,1), e: now, lbl:'YTD' };
+}
+
+// ── Fetch from /api/deals ──
+async function fetchDealsPage(after) {
+  const url = after ? `/api/deals?offset=${encodeURIComponent(after)}` : '/api/deals';
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error('HubSpot API error: ' + (err.error || res.statusText));
+  }
+  return await res.json();
+}
+
+async function loadData() {
+  const errBar = $('errorBar');
+  errBar.classList.remove('show');
+
+  try {
+    let all = [], after = null;
+    while (true) {
+      const page = await fetchDealsPage(after);
+      const results = page.results || [];
+      all = all.concat(results);
+      after = page.paging?.next?.after;
+      if (!after || results.length < 200) break;
+    }
+    allDeals = all;
+
+    const now = Date.now();
+    $('lastRefreshed').innerHTML = '<strong>Last refreshed from HubSpot:</strong> ' + fmtTimestamp(now);
+    localStorage.setItem('ods_refreshed', String(now));
+
+    renderAll();
+  } catch(err) {
+    console.error('Dashboard load error:', err);
+    errBar.textContent = '⚠ ' + (err.message || String(err));
+    errBar.classList.add('show');
+  }
+}
+
+// ── Computed metrics ──
+function compute() {
+  const { s, e } = getRange();
+  const open   = allDeals.filter(d => d.properties.hs_is_closed !== 'true');
+  const pipe   = open.reduce((t,d) => t + (+d.properties.amount||0), 0);
+  const trial  = open.filter(d => d.properties.dealstage === TRIAL_STAGE);
+  const trialV = trial.reduce((t,d) => t + (+d.properties.amount||0), 0);
+  const won    = allDeals.filter(d => {
+    if (d.properties.hs_is_closed_won !== 'true') return false;
+    const dt = d.properties.closedate ? new Date(d.properties.closedate) : null;
+    return dt && dt >= s && dt <= e;
+  });
+  const arr    = won.reduce((t,d) => t + (+d.properties.amount||0), 0);
+  const lost   = allDeals.filter(d => {
+    if (d.properties.dealstage !== 'closedlost') return false;
+    const dt = d.properties.closedate ? new Date(d.properties.closedate) : null;
+    return dt && dt >= s && dt <= e;
+  });
+  const tot    = won.length + lost.length;
+  const rate   = tot > 0 ? Math.round(won.length/tot*100) : 0;
+  const cyc    = won.filter(d=>d.properties.createdate&&d.properties.closedate);
+  const avgD   = cyc.length > 0
+    ? Math.round(cyc.reduce((t,d) =>
+        t + (new Date(d.properties.closedate)-new Date(d.properties.createdate))/86400000, 0
+      ) / cyc.length)
+    : null;
+  return { open, pipe, trial, trialV, won, arr, tot, rate, avgD };
+}
+
+// ── Chart ──
+const dataLabelPlugin = {
+  id: 'topLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx, data } = chart;
+    const ds = data.datasets[0];
+    const meta = chart.getDatasetMeta(0);
+    ctx.save();
+    ctx.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillStyle = '#555';
+    ctx.textAlign = 'center';
+    meta.data.forEach((pt, i) => {
+      const v = ds.data[i];
+      if (v != null) ctx.fillText(fmtK(v), pt.x, pt.y - 9);
+    });
+    ctx.restore();
+  }
+};
+
+function buildChartData() {
+  const { s, e } = getRange();
+  const won = allDeals.filter(d => {
+    if (d.properties.hs_is_closed_won !== 'true') return false;
+    const dt = d.properties.closedate ? new Date(d.properties.closedate) : null;
+    return dt && dt >= s && dt <= e;
+  });
+
+  const months = [];
+  const cur = new Date(s.getFullYear(), s.getMonth(), 1);
+  while (cur <= new Date(e.getFullYear(), e.getMonth(), 1)) {
+    months.push(new Date(cur));
+    cur.setMonth(cur.getMonth()+1);
+  }
+
+  const key = dt => dt.getFullYear() + '-' + dt.getMonth();
+  const bucket = {};
+  won.forEach(d => {
+    const k = key(new Date(d.properties.closedate));
+    if (!bucket[k]) bucket[k] = { v:0, n:0 };
+    bucket[k].v += +d.properties.amount||0;
+    bucket[k].n++;
+  });
+
+  let cum = 0;
+  const labels  = months.map(m => m.toLocaleString('default',{month:'short'}));
+  const cumData = months.map(m => { cum += bucket[key(m)]?.v||0; return cum; });
+  const dealCts = months.map(m => bucket[key(m)]?.n||0);
+  return { labels, cumData, dealCts, won };
+}
+
+function renderChart() {
+  const { labels, cumData, dealCts } = buildChartData();
+  const ctx = $('arrChart').getContext('2d');
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    plugins: [dataLabelPlugin],
+    data: {
+      labels,
+      datasets: [{
+        data: cumData,
+        borderColor: '#16a34a',
+        backgroundColor: 'rgba(22,163,74,0.07)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0,
+        pointBackgroundColor: '#fff',
+        pointBorderColor: '#16a34a',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 20 } },
+      animation: { duration: 250 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => fmtK(ctx.parsed.y),
+            afterLabel: ctx => dealCts[ctx.dataIndex] + ' deal' + (dealCts[ctx.dataIndex]!==1?'s':'')
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 11 }, color: '#aaa',
+            callback(v, i) { return [labels[i], dealCts[i] + (dealCts[i]!==1?' deals':' deal')]; }
+          }
+        },
+        y: {
+          grid: { color: '#f0f0f0' },
+          beginAtZero: true,
+          ticks: { font:{size:11}, color:'#aaa', callback: v => fmtK(v) }
+        }
+      }
+    }
+  });
+}
+
+// ── Stage table ──
+function renderStageTable() {
+  const open = allDeals.filter(d => d.properties.hs_is_closed !== 'true');
+  const byS  = {};
+  open.forEach(d => {
+    const s = d.properties.dealstage;
+    if (!byS[s]) byS[s] = [];
+    byS[s].push(d);
+  });
+
+  const rows = [];
+  STAGES.forEach(({ id, label }) => {
+    const deals = byS[id] || [];
+    if (!deals.length) return;
+    const total = deals.reduce((t,d) => t+(+d.properties.amount||0), 0);
+    const isOpen = expanded.has(id);
+    rows.push(`
+      <tr class="stage-row" onclick="toggleStage('${id}')">
+        <td>
+          <span class="chevron${isOpen?' open':''}">
+            <svg width="7" height="11" viewBox="0 0 7 11" fill="none">
+              <path d="M1.5 1.5l4 4-4 4" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="stage-badge">${label}</span>
+        </td>
+        <td style="text-align:right;font-weight:600;color:#333">${deals.length}</td>
+        <td style="text-align:right;font-weight:600;color:#333">${fmtK(total)}</td>
+      </tr>`);
+    if (isOpen) {
+      deals.forEach(d => {
+        const a = +d.properties.amount||0;
+        rows.push(`
+          <tr class="deal-sub-row">
+            <td>${d.properties.dealname||'—'}</td>
+            <td></td>
+            <td style="text-align:right">${a ? fmtK(a) : '—'}</td>
+          </tr>`);
+      });
+    }
+  });
+
+  $('stageBody').innerHTML = rows.length
+    ? rows.join('')
+    : '<tr><td colspan="3" class="loading-msg">No active deals</td></tr>';
+}
+
+function toggleStage(id) {
+  expanded.has(id) ? expanded.delete(id) : expanded.add(id);
+  localStorage.setItem('ods_expanded', JSON.stringify([...expanded]));
+  renderStageTable();
+}
+
+// ── Full render ──
+function renderAll() {
+  const { lbl } = getRange();
+  const m = compute();
+  const { won, dealCts } = buildChartData();
+
+  $('chartTitle').textContent = `ARR Growth └ ${lbl}`;
+  $('chartSub').textContent   = `Cumulative ARR · ${won.length} deal${won.length!==1?'s':''} · ${fmtK(m.arr)}`;
+  renderChart();
+
+  $('mPipe').textContent     = fmtK(m.pipe);
+  $('mPipeSub').textContent  = m.open.length + ' active deal' + (m.open.length!==1?'s':'');
+  $('mTrial').textContent    = fmtK(m.trialV);
+  $('mTrialSub').textContent = m.trial.length + ' on trial';
+  $('mArr').textContent      = fmtK(m.arr);
+  $('mArrSub').textContent   = m.won.length + ' closed won';
+  $('mClose').textContent    = m.rate + '%';
+  $('mCloseSub').textContent = m.won.length + ' won / ' + m.tot + ' deals';
+  $('mCycle').textContent    = m.avgD != null ? m.avgD + 'd' : '—';
+
+  renderStageTable();
+}
+
+// ── Period tab wiring ──
+document.querySelectorAll('.ptab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ptab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    period = btn.dataset.p;
+    localStorage.setItem('ods_period', period);
+    $('customRange').classList.toggle('show', period === 'custom');
+    if (period !== 'custom') renderAll();
+  });
+});
+
+function applyCustom() {
+  const f = $('dateFrom').value, t = $('dateTo').value;
+  if (f && t) { customFrom = new Date(f); customTo = new Date(t+'T23:59:59'); renderAll(); }
+}
+
+// ── Init ──
+(function init() {
+  document.querySelectorAll('.ptab').forEach(b => {
+    b.classList.toggle('active', b.dataset.p === period);
+  });
+  if (period === 'custom') $('customRange').classList.add('show');
+
+  const cached = localStorage.getItem('ods_refreshed');
+  if (cached) {
+    $('lastRefreshed').innerHTML = '<strong>Last refreshed from HubSpot:</strong> ' + fmtTimestamp(+cached);
+  }
+
+  loadData();
+})();
+</script>
+</body>
+</html>
